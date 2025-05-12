@@ -1,32 +1,39 @@
 package com.rookies3.myspringbootlab.controller.dto;
 
 import com.rookies3.myspringbootlab.entity.Book;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
+
 import java.time.LocalDate;
 
 public class BookDTO {
 
     @Getter
     @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class BookCreateRequest {
-        @NotBlank(message = "Title cannot be blank")
+        @NotBlank(message = "제목은 필수 입력 항목입니다.")
         private String title;
 
-        @NotBlank(message = "Author cannot be blank")
+        @NotBlank(message = "저자는 필수 입력 항목입니다.")
         private String author;
 
-        @NotBlank(message = "ISBN cannot be blank")
-        @Pattern(regexp = "^[0-9]{10,13}$", message = "ISBN must be 10-13 digits")
+        @NotBlank(message = "ISBN은 필수 입력 항목입니다.")
         private String isbn;
 
-        @Positive(message = "Price must be positive")
+        @Positive(message = "가격은 양수여야 합니다.")
         private Integer price;
 
-        @PastOrPresent(message = "Publish date cannot be in the future")
+        //@NotBlank(message = "출판일자는 필수 입력 항목입니다.")
         private LocalDate publishDate;
 
+        //BookCreateRequest => Entity
         public Book toEntity() {
             Book book = new Book();
             book.setTitle(this.title);
@@ -40,22 +47,27 @@ public class BookDTO {
 
     @Getter
     @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class BookUpdateRequest {
-        @NotBlank(message = "Title cannot be blank")
-        private String title;
-
-        @NotBlank(message = "Author cannot be blank")
-        private String author;
-
-        @Positive(message = "Price must be positive")
+        @Positive(message = "가격은 양수여야 합니다.")
         private Integer price;
 
-        @PastOrPresent(message = "Publish date cannot be in the future")
+        // 확장 가능성을 위해 추가 필드들을 옵셔널하게 포함할 수 있음
+        @NotBlank(message = "제목은 필수 입력 항목입니다.")
+        private String title;
+
+        @NotBlank(message = "저자는 필수 입력 항목입니다.")
+        private String author;
+
+        //@NotBlank(message = "출판일자는 필수 입력 항목입니다.")
         private LocalDate publishDate;
     }
 
     @Getter
     @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class BookResponse {
         private Long id;
         private String title;
@@ -64,15 +76,16 @@ public class BookDTO {
         private Integer price;
         private LocalDate publishDate;
 
+        //Book => BookResponse
         public static BookResponse from(Book book) {
-            BookResponse response = new BookResponse();
-            response.setId(book.getId());
-            response.setTitle(book.getTitle());
-            response.setAuthor(book.getAuthor());
-            response.setIsbn(book.getIsbn());
-            response.setPrice(book.getPrice());
-            response.setPublishDate(book.getPublishDate());
-            return response;
+            return new BookResponse(
+                    book.getId(),
+                    book.getTitle(),
+                    book.getAuthor(),
+                    book.getIsbn(),
+                    book.getPrice(),
+                    book.getPublishDate()
+            );
         }
     }
 }
