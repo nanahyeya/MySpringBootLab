@@ -8,8 +8,11 @@ import java.time.LocalDate;
 
 @Entity
 @Table(name = "books")
-@Getter @Setter
-@DynamicUpdate
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Getter
+@Setter
 public class Book {
 
     @Id
@@ -29,7 +32,10 @@ public class Book {
     @Column(nullable = false)
     private Integer price;
 
-    @Column(nullable = false)
     private LocalDate publishDate;
 
+    @OneToOne(mappedBy = "book",
+            cascade = CascadeType.ALL,
+            fetch = FetchType.LAZY)
+    private BookDetail bookDetail;
 }
