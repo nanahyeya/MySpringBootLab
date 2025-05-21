@@ -32,30 +32,7 @@ public class BookDTO {
         private LocalDate publishDate;
 
         @Valid
-        private BookDetailDTO detailRequest;
-    }
-
-    // 부분 수정을 위한 새로운 DTO
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class PatchRequest {
-        private String title;
-        private String author;
-
-        @Pattern(regexp = "^(?=(?:\\D*\\d){10}(?:(?:\\D*\\d){3})?$)[\\d-]+$",
-                message = "ISBN must be valid (10 or 13 digits, with or without hyphens)")
-        private String isbn;
-
-        @PositiveOrZero(message = "Price must be positive or zero")
-        private Integer price;
-
-        @Past(message = "Publish date must be in the past")
-        private LocalDate publishDate;
-
-        @Valid
-        private BookDetailPatchRequest detailRequest;
+        private BookDetailDTO detail;
     }
 
     @Data
@@ -63,20 +40,6 @@ public class BookDTO {
     @AllArgsConstructor
     @Builder
     public static class BookDetailDTO {
-        private String description;
-        private String language;
-        private Integer pageCount;
-        private String publisher;
-        private String coverImageUrl;
-        private String edition;
-    }
-
-    // BookDetail 부분 수정을 위한 DTO
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class BookDetailPatchRequest {
         private String description;
         private String language;
         private Integer pageCount;

@@ -5,11 +5,13 @@ import com.rookies3.myspringbootlab.service.BookService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/books")
@@ -54,30 +56,11 @@ public class BookController {
         return new ResponseEntity<>(createdBook, HttpStatus.CREATED);
     }
 
-    // 전체 교체 (기존 방식 유지)
     @PutMapping("/{id}")
     public ResponseEntity<BookDTO.Response> updateBook(
             @PathVariable Long id,
             @Valid @RequestBody BookDTO.Request request) {
         BookDTO.Response updatedBook = bookService.updateBook(id, request);
-        return ResponseEntity.ok(updatedBook);
-    }
-
-    // 부분 수정 (새로 추가)
-    @PatchMapping("/{id}")
-    public ResponseEntity<BookDTO.Response> partialUpdateBook(
-            @PathVariable Long id,
-            @RequestBody BookDTO.PatchRequest request) {
-        BookDTO.Response updatedBook = bookService.partialUpdateBook(id, request);
-        return ResponseEntity.ok(updatedBook);
-    }
-
-    // BookDetail만 수정
-    @PatchMapping("/{id}/detail")
-    public ResponseEntity<BookDTO.Response> updateBookDetail(
-            @PathVariable Long id,
-            @RequestBody BookDTO.BookDetailPatchRequest request) {
-        BookDTO.Response updatedBook = bookService.updateBookDetail(id, request);
         return ResponseEntity.ok(updatedBook);
     }
 
