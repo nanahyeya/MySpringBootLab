@@ -1,13 +1,17 @@
 package com.rookies3.myspringbootlab.service;
 
 import com.rookies3.myspringbootlab.controller.dto.BookDTO;
+import com.rookies3.myspringbootlab.controller.dto.PublisherDTO;
 import com.rookies3.myspringbootlab.entity.Book;
 import com.rookies3.myspringbootlab.entity.BookDetail;
+import com.rookies3.myspringbootlab.entity.Publisher;
 import com.rookies3.myspringbootlab.exception.BusinessException;
 import com.rookies3.myspringbootlab.exception.ErrorCode;
 import com.rookies3.myspringbootlab.repository.BookDetailRepository;
 import com.rookies3.myspringbootlab.repository.BookRepository;
 
+import com.rookies3.myspringbootlab.repository.PublisherRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,133 +20,167 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+
+
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class BookService {
 
     private final BookRepository bookRepository;
-    private final BookDetailRepository bookDetailRepository;
+    private final PublisherRepository publisherRepository;
+    private final BookDetailService bookDetailService;
 
+    @Transactional(readOnly = true)
     public List<BookDTO.Response> getAllBooks() {
-        return bookRepository.findAll()
-                .stream()
-                .map(BookDTO.Response::fromEntity)
-                .toList();
+        return bookRepository.findAll().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public BookDTO.Response getBookById(Long id) {
-        Book book = bookRepository.findByIdWithBookDetail(id)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Book", "id", id));
-        return BookDTO.Response.fromEntity(book);
+        Book book = bookRepository.findByIdWithAllDetails(id)
+                .orElseThrow(() -> new EntityNotFoundException("도서를 찾을 수 없습니다. ID: " + id));
+        return convertToResponse(book);
     }
 
+    @Transactional(readOnly = true)
     public BookDTO.Response getBookByIsbn(String isbn) {
         Book book = bookRepository.findByIsbnWithBookDetail(isbn)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Book", "ISBN", isbn));
-        return BookDTO.Response.fromEntity(book);
+                .orElseThrow(() -> new EntityNotFoundException("도서를 찾을 수 없습니다. ISBN: " + isbn));
+        return convertToResponse(book);
     }
 
+    @Transactional(readOnly = true)
     public List<BookDTO.Response> getBooksByAuthor(String author) {
-        return bookRepository.findByAuthorContainingIgnoreCase(author)
-                .stream()
-                .map(BookDTO.Response::fromEntity)
-                .toList();
+        return bookRepository.findByAuthorContainingIgnoreCase(author).stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<BookDTO.Response> getBooksByTitle(String title) {
-        return bookRepository.findByTitleContainingIgnoreCase(title)
-                .stream()
-                .map(BookDTO.Response::fromEntity)
-                .toList();
+        return bookRepository.findByTitleContainingIgnoreCase(title).stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<BookDTO.Response> getBooksByPublisherId(Long publisherId) {
+        return bookRepository.findByPublisherId(publisherId).stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
     public BookDTO.Response createBook(BookDTO.Request request) {
-        // Validate ISBN is not already in use
         if (bookRepository.existsByIsbn(request.getIsbn())) {
-            throw new BusinessException(ErrorCode.ISBN_DUPLICATE, request.getIsbn());
+            throw new DuplicateIsbnException("이미 존재하는 ISBN입니다: " + request.getIsbn());
         }
 
-        // Create book entity
+        Publisher publisher = null;
+        if (request.getPublisherId() != null) {
+            publisher = publisherRepository.findById(request.getPublisherId())
+                    .orElseThrow(() -> new EntityNotFoundException("출판사를 찾을 수 없습니다. ID: " + request.getPublisherId()));
+        }
+
         Book book = Book.builder()
                 .title(request.getTitle())
                 .author(request.getAuthor())
                 .isbn(request.getIsbn())
-                .price(request.getPrice())
                 .publishDate(request.getPublishDate())
+                .price(request.getPrice())
+                .publisher(publisher)
                 .build();
 
-        // Create book detail if provided
-        if (request.getDetail() != null) {
-            BookDetail bookDetail = BookDetail.builder()
-                    .description(request.getDetail().getDescription())
-                    .language(request.getDetail().getLanguage())
-                    .pageCount(request.getDetail().getPageCount())
-                    .publisher(request.getDetail().getPublisher())
-                    .coverImageUrl(request.getDetail().getCoverImageUrl())
-                    .edition(request.getDetail().getEdition())
-                    //연관관계 저장
-                    .book(book)
-                    .build();
-            //연관관계 저장
-            book.setBookDetail(bookDetail);
+        Book savedBook = bookRepository.save(book);
+
+        // BookDetail 처리
+        if (request.getBookDetail() != null) {
+            BookDetailDTO.Request detailRequest = request.getBookDetail();
+            BookDetailDTO.Response bookDetail = bookDetailService.createBookDetail(
+                    savedBook.getId(), detailRequest);
+            savedBook.setBookDetail(bookDetailService.getBookDetailEntity(bookDetail.getId()));
         }
 
-        // Save and return the book
-        Book savedBook = bookRepository.save(book);
-        return BookDTO.Response.fromEntity(savedBook);
+        return convertToResponse(savedBook);
     }
 
     @Transactional
     public BookDTO.Response updateBook(Long id, BookDTO.Request request) {
-        // Find the book
-        Book book = bookRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Book", "id", id));
+        Book book = bookRepository.findByIdWithAllDetails(id)
+                .orElseThrow(() -> new EntityNotFoundException("도서를 찾을 수 없습니다. ID: " + id));
 
-        // Check if another book already has the ISBN
         if (!book.getIsbn().equals(request.getIsbn()) &&
                 bookRepository.existsByIsbn(request.getIsbn())) {
-            throw new BusinessException(ErrorCode.ISBN_DUPLICATE, request.getIsbn());
+            throw new DuplicateIsbnException("이미 존재하는 ISBN입니다: " + request.getIsbn());
         }
 
-        // Update book basic info
+        Publisher publisher = null;
+        if (request.getPublisherId() != null) {
+            publisher = publisherRepository.findById(request.getPublisherId())
+                    .orElseThrow(() -> new EntityNotFoundException("출판사를 찾을 수 없습니다. ID: " + request.getPublisherId()));
+        }
+
         book.setTitle(request.getTitle());
         book.setAuthor(request.getAuthor());
         book.setIsbn(request.getIsbn());
-        book.setPrice(request.getPrice());
         book.setPublishDate(request.getPublishDate());
+        book.setPrice(request.getPrice());
+        book.setPublisher(publisher);
 
-        // Update book detail if provided
-        if (request.getDetail() != null) {
-            BookDetail bookDetail = book.getBookDetail();
-
-            // Create new detail if not exists
-            if (bookDetail == null) {
-                bookDetail = new BookDetail();
-                bookDetail.setBook(book);
-                book.setBookDetail(bookDetail);
+        // BookDetail 처리
+        if (request.getBookDetail() != null) {
+            if (book.getBookDetail() != null) {
+                bookDetailService.updateBookDetail(book.getBookDetail().getId(), request.getBookDetail());
+            } else {
+                BookDetailDTO.Response bookDetail = bookDetailService.createBookDetail(
+                        book.getId(), request.getBookDetail());
+                book.setBookDetail(bookDetailService.getBookDetailEntity(bookDetail.getId()));
             }
-
-            // Update detail fields
-            bookDetail.setDescription(request.getDetail().getDescription());
-            bookDetail.setLanguage(request.getDetail().getLanguage());
-            bookDetail.setPageCount(request.getDetail().getPageCount());
-            bookDetail.setPublisher(request.getDetail().getPublisher());
-            bookDetail.setCoverImageUrl(request.getDetail().getCoverImageUrl());
-            bookDetail.setEdition(request.getDetail().getEdition());
         }
 
-        // Save and return updated book
         Book updatedBook = bookRepository.save(book);
-        return BookDTO.Response.fromEntity(updatedBook);
+        return convertToResponse(updatedBook);
     }
 
     @Transactional
     public void deleteBook(Long id) {
-        if (!bookRepository.existsById(id)) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Book", "id", id);
+        Book book = bookRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("도서를 찾을 수 없습니다. ID: " + id));
+        bookRepository.delete(book);
+    }
+
+    private BookDTO.Response convertToResponse(Book book) {
+        PublisherDTO.Response publisherResponse = null;
+        if (book.getPublisher() != null) {
+            publisherResponse = PublisherDTO.Response.builder()
+                    .id(book.getPublisher().getId())
+                    .name(book.getPublisher().getName())
+                    .establishedDate(book.getPublisher().getEstablishedDate())
+                    .address(book.getPublisher().getAddress())
+                    .build();
         }
-        bookRepository.deleteById(id);
+
+        BookDetailDTO.Response bookDetailResponse = null;
+        if (book.getBookDetail() != null) {
+            bookDetailResponse = BookDetailDTO.Response.builder()
+                    .id(book.getBookDetail().getId())
+                    .description(book.getBookDetail().getDescription())
+                    .pageCount(book.getBookDetail().getPageCount())
+                    .language(book.getBookDetail().getLanguage())
+                    .build();
+        }
+
+        return BookDTO.Response.builder()
+                .id(book.getId())
+                .title(book.getTitle())
+                .author(book.getAuthor())
+                .isbn(book.getIsbn())
+                .publishDate(book.getPublishDate())
+                .price(book.getPrice())
+                .publisher(publisherResponse)
+                .bookDetail(bookDetailResponse)
+                .build();
     }
 }

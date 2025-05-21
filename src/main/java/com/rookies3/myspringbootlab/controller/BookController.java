@@ -38,30 +38,35 @@ public class BookController {
         return ResponseEntity.ok(book);
     }
 
-    @GetMapping("/search/author")
-    public ResponseEntity<List<BookDTO.Response>> getBooksByAuthor(@RequestParam String author) {
+    @GetMapping("/author/{author}")
+    public ResponseEntity<List<BookDTO.Response>> getBooksByAuthor(@PathVariable String author) {
         List<BookDTO.Response> books = bookService.getBooksByAuthor(author);
         return ResponseEntity.ok(books);
     }
 
-    @GetMapping("/search/title")
-    public ResponseEntity<List<BookDTO.Response>> getBooksByTitle(@RequestParam String title) {
+    @GetMapping("/title/{title}")
+    public ResponseEntity<List<BookDTO.Response>> getBooksByTitle(@PathVariable String title) {
         List<BookDTO.Response> books = bookService.getBooksByTitle(title);
+        return ResponseEntity.ok(books);
+    }
+
+    @GetMapping("/publisher/{publisherId}")
+    public ResponseEntity<List<BookDTO.Response>> getBooksByPublisherId(@PathVariable Long publisherId) {
+        List<BookDTO.Response> books = bookService.getBooksByPublisherId(publisherId);
         return ResponseEntity.ok(books);
     }
 
     @PostMapping
     public ResponseEntity<BookDTO.Response> createBook(@Valid @RequestBody BookDTO.Request request) {
-        BookDTO.Response createdBook = bookService.createBook(request);
-        return new ResponseEntity<>(createdBook, HttpStatus.CREATED);
+        BookDTO.Response book = bookService.createBook(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(book);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<BookDTO.Response> updateBook(
-            @PathVariable Long id,
-            @Valid @RequestBody BookDTO.Request request) {
-        BookDTO.Response updatedBook = bookService.updateBook(id, request);
-        return ResponseEntity.ok(updatedBook);
+            @PathVariable Long id, @Valid @RequestBody BookDTO.Request request) {
+        BookDTO.Response book = bookService.updateBook(id, request);
+        return ResponseEntity.ok(book);
     }
 
     @DeleteMapping("/{id}")
